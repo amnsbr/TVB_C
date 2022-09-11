@@ -1,4 +1,4 @@
-84 0.65 0.15 1.4 1.0 0.01 900000 10000 720 999999.99 41 
+84 0.65 0.15 1.4 1.0 0.01 900000 10000 720 999999.99 41 1.0 0.1
 
 
 Parameter sorting:
@@ -14,3 +14,5 @@ Parameter sorting:
 9. BOLD_TR:  	TR of the simulated BOLD data in ms
 10. trans_v:    transmission velocity in m/s. For instantaneous transmission set to a large value (like 999999.99)
 11. seed:     	seed for random number generator
+12. J_i_scale: adjust best J_i in each node (from FIC output) by this ratio
+13. heterogeneity_scale: if heterogeneity file exists, scale J_NMDA by (1 + heterogeneity_map[j] * heterogeneity_scale) # consider scaling w_plus

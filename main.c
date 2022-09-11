@@ -360,7 +360,9 @@ int main(int argc, char *argv[])
     const float w_I     = 0.7;          // scaling of external input for inhibitory pool
     const float gamma_I = 1.0/1000.0;   // for expressing inhib. pop. in ms
     float       tmpJi   = 0.0;          // Feedback inhibition J_i
-    
+    float       J_i_scale = 1.0;        // scaling of best J_i calculated by FIC
+    float       heterogeneity_scale = 0.0; // scaling of local parameters (except J_i) by heterogeneity map
+
     /*
      Input-file mode is on: overwrite some parameter-values as specified in additional param-file
      */
@@ -372,13 +374,13 @@ int main(int argc, char *argv[])
         exit(0);
     }
     // paramfile: <param1> <param2> ...
-    if(fscanf(file,"%d",&nodes) != EOF && fscanf(file,"%f",&G) != EOF && fscanf(file,"%f",&J_NMDA) != EOF && fscanf(file,"%f",&w_plus) != EOF && fscanf(file,"%f",&tmpJi) != EOF && fscanf(file,"%f",&sigma) != EOF && fscanf(file,"%d",&time_steps) != EOF && fscanf(file,"%d",&FIC_time_steps) != EOF && fscanf(file,"%d",&BOLD_TR) != EOF && fscanf(file,"%f",&global_trans_v) != EOF && fscanf(file,"%d",&rand_num_seed) != EOF){
+    if(fscanf(file,"%d",&nodes) != EOF && fscanf(file,"%f",&G) != EOF && fscanf(file,"%f",&J_NMDA) != EOF && fscanf(file,"%f",&w_plus) != EOF && fscanf(file,"%f",&tmpJi) != EOF && fscanf(file,"%f",&sigma) != EOF && fscanf(file,"%d",&time_steps) != EOF && fscanf(file,"%d",&FIC_time_steps) != EOF && fscanf(file,"%d",&BOLD_TR) != EOF && fscanf(file,"%f",&global_trans_v) != EOF && fscanf(file,"%d",&rand_num_seed) != EOF && fscanf(file,"%f",&J_i_scale) != EOF && fscanf(file,"%f",&heterogeneity_scale) != EOF){
     } else{
         printf( "\nERROR: Unexpected end-of-file in file %s. File contains less input than expected. Terminating... \n\n", argv[1]);
         exit(0);
     }
     fclose(file);
-    
+
     if (nodes % vectorization_grade != 0){
         printf( "\nERROR: Specified number of nodes (%d) is not a multiple of vectorization grade (%d). Terminating... \n\n", nodes, vectorization_grade);
         exit(0);
@@ -446,6 +448,28 @@ int main(int argc, char *argv[])
     float tmp_exp_E[4]          __attribute__((aligned(16)));
     float tmp_exp_I[4]          __attribute__((aligned(16)));
     float rand_number[4]        __attribute__((aligned(16)));
+
+    /*
+     Import heterogeneity map
+     Note: it must be Z-scored among cortical parcels
+     and set to 0 for subcortical parcels
+     */
+    float heterogeneity[nodes];
+    memset(heterogeneity, 0, nodes*sizeof(float));
+    char heterogeneity_filename[100];memset(heterogeneity_filename, 0, 100*sizeof(char));
+    strcpy(heterogeneity_filename,"input/");strcat(heterogeneity_filename,argv[2]);strcat(heterogeneity_filename,"_heterogeneity.txt");
+    FILE *file_heterogeneity;
+    file_heterogeneity=fopen(heterogeneity_filename, "r");
+    if (file_heterogeneity==NULL || heterogeneity_scale==0.0) {
+        printf("Heterogeneity file not found or the scaling factor set to zero. Using homogeneous model. \n\n");
+    } else {
+        printf("Using heterogeneous model based on the map %s and scaling factor %f \n\n", heterogeneity_filename, heterogeneity_scale);
+        for (j = 0; j < nodes; j++) {
+            // TODO: this does not explicitly check if there are enough regions in the file
+            fscanf(file_heterogeneity, "%f", &heterogeneity[j]);
+        }
+        fclose(file_heterogeneity);
+    }
     
     /*
      Import and setup global and local connectivity
@@ -464,6 +488,7 @@ int main(int argc, char *argv[])
     
     int         maxdelay = importGlobalConnectivity(cap_file, dist_file, reg_file, regions, &region_activity, &reg_globinp_p, global_trans_v, &n_conn_table, &n_conn_table_G_NMDA, G_J_NMDA, &SC_cap, &SC_rowsums, &SC_inpreg);
     int         reg_act_size = regions * maxdelay;
+
     
     // That's a first guess for good J_i values
     for (j = 0; j < nodes; j++) {
@@ -751,19 +776,15 @@ int main(int argc, char *argv[])
         
         
         /*
-         Write out J_i values found during FIC tuning
+         Adjust best J_i values found in FIC tuning 
+         by J_i_scale, write it to output file, and set
+         it to the J_i value at each node
          */
+        fprintf(FCout, "nodal SC_rowsumbs\tJ_i\n");
         for (j=0; j<nodes; j++) {
-            fprintf(FCout, "%.7f %.7f\n",SC_rowsums[j],best_Ji[j]);
-        }
-
-    
-        // Use J_i values that gave best results during FIC tuning
-        for (j = 0; j < nodes; j++){
-            J_i[j]          =       best_Ji[j];
-        }
-        
-
+            J_i[j] = best_Ji[j] * J_i_scale;
+            fprintf(FCout, "%.7f %.7f\n",SC_rowsums[j],J_i[j]);
+        }      
 
         
         /*
@@ -944,7 +965,7 @@ int main(int argc, char *argv[])
         /*
          Print fMRI time series
          */
-        
+        fprintf(FCout, "Simulated bold:\n");
         //fprintf(FCout, "%.10f %.10f %.10f %.10f %.10f %.10f %.2f \n\n", G, J_NMDA, w_plus, tmpJi, sigma, global_trans_v, mean_mean_FR);
         for (i=0; i<BOLD_len_i; i++) {
             for (j=0; j<num_output_ts; j++) {
