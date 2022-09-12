@@ -10,6 +10,11 @@ For questions and other enquiries please contact
 Michael Schirner (m.schirner@fu-berlin.de) or 
 Petra Ritter (petra.ritter@charite.de).
 
+## Modifications
+On top of the original code in https://github.com/amandakeasson/TVB_C I have made some modifications:
+1. Added an option for "disrupting" FIC from the "healthy" regime, i.e., reducing or increasing optimal `J_i` values (identified by the FIC algorithm) by a `J_i_scale` parameter, to be able to model different levels of E-I imbalance, following [Yang et al. 2016 PNAS](https://doi.org/10.1073/pnas.1508436113). The `J_i_scale` parameter by default is 1.0, which reflects no disruption in the FIC.
+2. Added an option for introducing regional heterogeneity of J_NMDA in the model based on a heterogeneity map and a `heterogeneity_scale` parameter. This is inspired by (but not exactly implement) the approach used in [Deco et al. 2021 Sci Adv](https://doi.org/10.1126/sciadv.abf4752) and [Demirtaş et al. 2019 Neuron](https://doi.org/10.1016/j.neuron.2019.01.017).
+
 # Usage
 
 ```
@@ -30,7 +35,8 @@ Example
 • The relative folder structure, i.e., the location of the folders 'input' and 'output' relative to the program binary needs to remain stable, otherwise the program won't be able to read or write data.
 
 • Due to optimization reasons, the number of nodes must be divisible by four. If the number of nodes is not divisible by four, "fake" regions must be added that contain zero coupling to other nodes (all zeros in strength matrix).
-  
+
+• To introduce heterogeneity of J_NMDA in the model, a txt file with <subject_id> as prefix and `_heterogeneity.txt` should be added to the input folder, with one value in each line for each region. A value of 0 in a region means no divergence from the J_NMDA_bias, but positive/negative values make the J_NMDA of a region higher/lower than the bias term: `J_NMDA[i] = J_NMDA_bias * (1 + (heterogeneity[i] * heterogeneity_bias))`, with `heterogeneity` being the heterogeneity map and `heterogeneity_bias` the free parameters that determines the degree to which there's regional heterogeneity of J_NMDA. If this parameter is set to 0 or the txt file does not exist a homogeneous model will be simulated.
   
 # Compilation
   
