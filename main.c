@@ -26,55 +26,55 @@ struct SC_inpregS{
     int *inpreg;
 };
 
-FILE *FCout, *WFout;
+FILE *BOLDout; 
+FILE *JIout;
 
 #define REAL float
 //#define REAL double
 
 
-/* Compute Pearson's correlation coefficient */
-float corr(float *x, float *y, int n){
-    int i;
-    float mx=0, my=0;
+// /* Compute Pearson's correlation coefficient */
+// float corr(float *x, float *y, int n){
+//     int i;
+//     float mx=0, my=0;
     
-    /* Calculate the mean of the two series x[], y[] */
-    for (i=0; i<n; i++) {
-        mx += x[i];
-        my += y[i];
-    }
-    mx /= n;
-    my /= n;
+//     /* Calculate the mean of the two series x[], y[] */
+//     for (i=0; i<n; i++) {
+//         mx += x[i];
+//         my += y[i];
+//     }
+//     mx /= n;
+//     my /= n;
     
-    /* Calculate the correlation */
-    float sxy = 0, sxsq = 0, sysq = 0, tmpx, tmpy;
-    for (i=0; i<n; i++) {
-        tmpx = x[i] - mx;
-        tmpy = y[i] - my;
-        sxy += tmpx*tmpy;
-        sxsq += tmpx*tmpx;
-        sysq += tmpy*tmpy;
-    }
+//     /* Calculate the correlation */
+//     float sxy = 0, sxsq = 0, sysq = 0, tmpx, tmpy;
+//     for (i=0; i<n; i++) {
+//         tmpx = x[i] - mx;
+//         tmpy = y[i] - my;
+//         sxy += tmpx*tmpy;
+//         sxsq += tmpx*tmpx;
+//         sysq += tmpy*tmpy;
+//     }
     
-    return (sxy / (sqrt(sxsq)*sqrt(sysq)));
-}
+//     return (sxy / (sqrt(sxsq)*sqrt(sysq)));
+// }
 
 
-
-void openFCoutfile(char *paramset){
+void openoutfiles(char *paramset){
     char outfilename[1000];memset(outfilename, 0, 1000*sizeof(char));
     char buffer[10];memset(buffer, 0, 10*sizeof(char));
     char underscore[2];
     underscore[0]='_';
     underscore[1]='\0';
     strcpy (outfilename,"output/");
-    strcat (outfilename,"/BOLD_");strcat (outfilename,paramset);
+    strcat (outfilename,"/simBOLD_");strcat (outfilename,paramset);
     strcat (outfilename,".txt");
-    FCout = fopen(outfilename, "w");
+    BOLDout = fopen(outfilename, "w");
     memset(outfilename, 0, 1000*sizeof(char));
     strcpy (outfilename,"output/");
-    strcat (outfilename,"/SV_");strcat (outfilename,paramset);
+    strcat (outfilename,"/Ji_");strcat (outfilename,paramset);
     strcat (outfilename,".txt");
-    //WFout = fopen(outfilename, "w");
+    JIout = fopen(outfilename, "w");
 }
 
 
@@ -316,7 +316,7 @@ int main(int argc, char *argv[])
         printf( "\nERROR: Wrong number of arguments.\n\nUsage: tvbii <paramfile> <subid>\n\nTerminating... \n\n");
         exit(0);
     }
-    openFCoutfile(argv[1]);
+    openoutfiles(argv[1]);
     char subject_file[120];memset(subject_file, 0, 120*sizeof(char));
     strcpy(subject_file,"input/");strcat(subject_file,argv[2]);
     strcat(subject_file,"_input_exc.txt");
@@ -474,6 +474,7 @@ int main(int argc, char *argv[])
             // TODO: this does not explicitly check if there are enough regions in the file
             fscanf(file_heterogeneity, "%f", &heterogeneity[j]);
             J_NMDA[j] = J_NMDA_bias * (1 + (heterogeneity_scale * heterogeneity[j]));
+            // TODO: set up a min (>= 0 at least) and max bound for J_NMDA[i]
         }
         fclose(file_heterogeneity);
     }
@@ -791,10 +792,9 @@ int main(int argc, char *argv[])
          by J_i_scale, write it to output file, and set
          it to the J_i value at each node
          */
-        fprintf(FCout, "nodal SC_rowsumbs\tJ_i\n");
         for (j=0; j<nodes; j++) {
             J_i[j] = best_Ji[j] * J_i_scale;
-            fprintf(FCout, "%.7f %.7f\n",SC_rowsums[j],J_i[j]);
+            fprintf(JIout, "%.4f\n",J_i[j]);
         }      
 
         
@@ -977,16 +977,15 @@ int main(int argc, char *argv[])
         /*
          Print fMRI time series
          */
-        fprintf(FCout, "Simulated bold:\n");
-        //fprintf(FCout, "%.10f %.10f %.10f %.10f %.10f %.10f %.2f \n\n", G, J_NMDA, w_plus, tmpJi, sigma, global_trans_v, mean_mean_FR);
         for (i=0; i<BOLD_len_i; i++) {
             for (j=0; j<num_output_ts; j++) {
-                fprintf(FCout, "%.7f ",BOLD_ex[j][i]);
+                fprintf(BOLDout, "%.7f ",BOLD_ex[j][i]);
             }
-            fprintf(FCout, "\n");
+            fprintf(BOLDout, "\n");
         }
-        fprintf(FCout, "\n");
-        fflush(FCout);
+        fprintf(BOLDout, "\n");
+        fflush(BOLDout);
+        fflush(JIout);
         
         
     }
@@ -998,8 +997,8 @@ int main(int argc, char *argv[])
     _mm_free(reg_globinp_p);
     _mm_free(SC_cap);
     
-    fclose(FCout);
-    //fclose(WFout);
+    fclose(BOLDout);
+    fclose(JIout);
     printf("TVB_C with FIC tuning finished. Execution took %.2f s\n", (float)(time(NULL) - start));
     
     return 0;
