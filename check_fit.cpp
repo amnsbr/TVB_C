@@ -104,15 +104,15 @@ gsl_vector * fcd_tril(gsl_matrix * bold, const int step, const int window_size) 
     return FCD_tril;
 }
 
-int main() {
+int main(int argc, char *argv[]) {
     const int n_regions = 84;
     const int n_pairs = ((n_regions) * (n_regions - 1)) / 2;
     // TODO: allow different duration, TR and n_vols for empirical and simualted data
     const int duration = 100000;
     const int TR = 720;
     const int n_vols = duration / TR;
-    int FCD_step = 5;
-    int FCD_window_size = 10; // not including the center
+    const int FCD_step = 5;
+    const int FCD_window_size = 10; // not including the center
     const char* emp_FC_path = "output/emp_FC_tril.txt";
     const bool write_sim_FC = true;
     // Read or create the empirical FC (lower triangle)

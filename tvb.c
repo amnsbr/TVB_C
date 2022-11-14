@@ -296,7 +296,7 @@ int importGlobalConnectivity(char *SC_cap_filename, char *SC_dist_filename, char
 
 
 /*
- Usage: tvbii <paramfile> <subject_id>
+ Usage: tvbii <paramfile> <path-to-subject> <n_regions>
  */
 
 int main(int argc, char *argv[])
@@ -312,18 +312,11 @@ int main(int argc, char *argv[])
     /*
      Open input/output file(s)
      */
-    if (argc != 3) {
-        printf( "\nERROR: Wrong number of arguments.\n\nUsage: tvbii <paramfile> <subid>\n\nTerminating... \n\n");
+    if (argc != 4) {
+        printf( "\nERROR: Wrong number of arguments.\n\nUsage: tvbii <paramfile> <path-to-subject> <n_regions>\n\nTerminating... \n\n");
         exit(0);
     }
-    openoutfiles(argv[1]);
-    char subject_file[120];memset(subject_file, 0, 120*sizeof(char));
-    strcpy(subject_file,"input/");strcat(subject_file,argv[2]);
-    strcat(subject_file,"_input_exc.txt");
-    char subject_file2[120];memset(subject_file2, 0, 120*sizeof(char));
-    strcpy(subject_file2,"input/");strcat(subject_file2,argv[2]);
-    strcat(subject_file2,"_input_inh.txt");
-    
+    openoutfiles(argv[1]);    
     
     
     
@@ -378,13 +371,14 @@ int main(int argc, char *argv[])
         exit(0);
     }
     // paramfile: <param1> <param2> ...
-    if(fscanf(file,"%d",&nodes) != EOF && fscanf(file,"%f",&G) != EOF && fscanf(file,"%f",&J_NMDA_bias) != EOF && fscanf(file,"%f",&w_plus) != EOF && fscanf(file,"%f",&tmpJi) != EOF && fscanf(file,"%f",&sigma) != EOF && fscanf(file,"%d",&time_steps) != EOF && fscanf(file,"%d",&FIC_time_steps) != EOF && fscanf(file,"%d",&BOLD_TR) != EOF && fscanf(file,"%f",&global_trans_v) != EOF && fscanf(file,"%d",&rand_num_seed) != EOF && fscanf(file,"%f",&J_i_scale) != EOF && fscanf(file,"%f",&heterogeneity_scale) != EOF){
+    if(fscanf(file,"%f",&G) != EOF && fscanf(file,"%f",&J_NMDA_bias) != EOF && fscanf(file,"%f",&w_plus) != EOF && fscanf(file,"%f",&tmpJi) != EOF && fscanf(file,"%f",&sigma) != EOF && fscanf(file,"%d",&time_steps) != EOF && fscanf(file,"%d",&FIC_time_steps) != EOF && fscanf(file,"%d",&BOLD_TR) != EOF && fscanf(file,"%f",&global_trans_v) != EOF && fscanf(file,"%d",&rand_num_seed) != EOF && fscanf(file,"%f",&J_i_scale) != EOF && fscanf(file,"%f",&heterogeneity_scale) != EOF){
     } else{
         printf( "\nERROR: Unexpected end-of-file in file %s. File contains less input than expected. Terminating... \n\n", argv[1]);
         exit(0);
     }
     fclose(file);
 
+    nodes = strtol(argv[3], NULL, 10);
     if (nodes % vectorization_grade != 0){
         printf( "\nERROR: Specified number of nodes (%d) is not a multiple of vectorization grade (%d). Terminating... \n\n", nodes, vectorization_grade);
         exit(0);
@@ -446,9 +440,10 @@ int main(int argc, char *argv[])
         S_i_I[j]            = 0.001;
         global_input[j]     = 0.001;
         meanFR[j]           = 0.0f;
-        J_NMDA[i]           = J_NMDA_bias;
+        J_NMDA[j]           = J_NMDA_bias;
     }
-    
+
+
     float       tmpglobinput;
     int         ring_buf_pos=0;
     float tmp_exp_E[4]          __attribute__((aligned(16)));
@@ -462,12 +457,17 @@ int main(int argc, char *argv[])
      */
     float heterogeneity[nodes];
     memset(heterogeneity, 0, nodes*sizeof(float));
-    char heterogeneity_filename[100];memset(heterogeneity_filename, 0, 100*sizeof(char));
-    strcpy(heterogeneity_filename,"input/");strcat(heterogeneity_filename,argv[2]);strcat(heterogeneity_filename,"_heterogeneity.txt");
+    char heterogeneity_filename[1000];memset(heterogeneity_filename, 0, 1000*sizeof(char));
+    strcpy(heterogeneity_filename,argv[2]);strcat(heterogeneity_filename,"/heterogeneity.txt");
     FILE *file_heterogeneity;
     file_heterogeneity=fopen(heterogeneity_filename, "r");
     if (file_heterogeneity==NULL || heterogeneity_scale==0.0) {
         printf("Heterogeneity file not found or the scaling factor set to zero. Using homogeneous model. \n\n");
+        // for (j = 0; j < nodes; j++) {
+        //     // TODO: this does not explicitly check if there are enough regions in the file
+        //     J_NMDA[j] = J_NMDA_bias * (1 + (heterogeneity_scale * heterogeneity[j]));
+        //     // TODO: set up a min (>= 0 at least) and max bound for J_NMDA[i]
+        // }
     } else {
         printf("Using heterogeneous model based on the map %s and scaling factor %f \n\n", heterogeneity_filename, heterogeneity_scale);
         for (j = 0; j < nodes; j++) {
@@ -478,7 +478,7 @@ int main(int argc, char *argv[])
         }
         fclose(file_heterogeneity);
     }
-    
+
     /*
      Import and setup global and local connectivity
      */
@@ -487,12 +487,12 @@ int main(int argc, char *argv[])
     struct Xi_p *reg_globinp_p;
     struct SC_capS      *SC_cap;
     struct SC_inpregS   *SC_inpreg;
-    char cap_file[100];memset(cap_file, 0, 100*sizeof(char));
-    strcpy(cap_file,"input/");strcat(cap_file,argv[2]);strcat(cap_file,"_SC_strengths.txt");
-    char dist_file[100];memset(dist_file, 0, 100*sizeof(char));
-    strcpy(dist_file,"input/");strcat(dist_file,argv[2]);strcat(dist_file,"_SC_distances.txt");
-    char reg_file[100];memset(reg_file, 0, 100*sizeof(char));
-    strcpy(reg_file,"input/");strcat(reg_file,argv[2]);strcat(reg_file,"_SC_regionids.txt");
+    char cap_file[1000];memset(cap_file, 0, 1000*sizeof(char));
+    strcpy(cap_file,argv[2]);strcat(cap_file,"/SC_strengths.txt");
+    char dist_file[1000];memset(dist_file, 0, 1000*sizeof(char));
+    strcpy(dist_file,argv[2]);strcat(dist_file,"/SC_distances.txt");
+    char reg_file[1000];memset(reg_file, 0, 1000*sizeof(char));
+    strcpy(reg_file,argv[2]);strcat(reg_file,"/SC_regionids.txt");
     
     int         maxdelay = importGlobalConnectivity(cap_file, dist_file, reg_file, regions, &region_activity, &reg_globinp_p, global_trans_v, &n_conn_table, &n_conn_table_G_NMDA, G, J_NMDA, &SC_cap, &SC_rowsums, &SC_inpreg);
     int         reg_act_size = regions * maxdelay;
@@ -553,8 +553,6 @@ int main(int argc, char *argv[])
     int ts_bold=0,ts, int_i, i_node_vec, ext_inp_counter=0;
     
     
-
-    
     /*
      Parameters for FIC tuning
      */
@@ -588,222 +586,228 @@ int main(int argc, char *argv[])
     for (i_SC = 0; i_SC < SCtune_iters; i_SC++) {
         
         
-        
-        /*
-         ******************************************************************************************
-         *************************************** FIC TUNING ***************************************
-         ******************************************************************************************
-         */
-        
-        tuning_factor       = 1.0;
-        max_num_nodes       = 0;
-        best_mean_FR        = 0;
-        for (i_fic = 0; i_fic < FIC_iters; i_fic++) {
-            
-            // Reset arrays
-            for (j = 0; j < nodes; j++) {
-                S_i_E[j]            = 0.001;
-                S_i_I[j]            = 0.001;
-                global_input[j]     = 0.001;
-                meanFR[j]           = 0.0;
-                FIC_I_E[j]          = 0.0;
-            }
-            ring_buf_pos        = 0;
-            for (j=0; j<maxdelay*regions; j++) {
-                region_activity[j]=0.001;
-            }
-            
-            
+        if (FIC_time_steps > 0) {
             /*
-             Burn-in phase
-             */
-            for (ts = 0; ts < FIC_burn_in_ts; ts++) {
-                for (int_i = 0; int_i < 10; int_i++) {
-                    
-                    /*
-                     Compute global coupling
-                     */
-                    for(j=0; j<regions; j++){
-                        tmpglobinput = 0;
-                        for (k=0; k<n_conn_table[j]; k++) {
-                            tmpglobinput += *reg_globinp_p[j+ring_buf_pos].Xi_elems[k] * SC_cap[j].cap[k];
-                        }
-                        global_input[j] = tmpglobinput;
-                    }
-                    
-                    for (i_node_vec = 0; i_node_vec < nodes_vec; i_node_vec++) {
-                        // Excitatory population firing rate
-                        // _tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
-                        _tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_mm_mul_ps(_w_plus, _J_NMDA[i_node_vec]), _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
-                        
-                        *_tmp_exp_E     = _mm_mul_ps(_min_d_E, _tmp_I_E);
-                        tmp_exp_E[0]    = tmp_exp_E[0] != 0 ? expf(tmp_exp_E[0]) : 0.9;
-                        tmp_exp_E[1]    = tmp_exp_E[1] != 0 ? expf(tmp_exp_E[1]) : 0.9;
-                        tmp_exp_E[2]    = tmp_exp_E[2] != 0 ? expf(tmp_exp_E[2]) : 0.9;
-                        tmp_exp_E[3]    = tmp_exp_E[3] != 0 ? expf(tmp_exp_E[3]) : 0.9;
-                        _tmp_H_E        = _mm_div_ps(_tmp_I_E, _mm_sub_ps(_one, *_tmp_exp_E));
-                        
-                        //_meanFR[i_node_vec] = _mm_add_ps(_meanFR[i_node_vec],_tmp_H_E);
-                        _r_i_E[i_node_vec]  = _tmp_H_E;
-                        
-                        // Inhibitory population firing rate
-                        _tmp_I_I = _mm_sub_ps(_mm_mul_ps(_a_I,_mm_sub_ps(_mm_add_ps(_w_I__I_0,_mm_mul_ps(_J_NMDA[i_node_vec], _S_i_E[i_node_vec])), _S_i_I[i_node_vec])),_b_I);
-                        *_tmp_exp_I   = _mm_mul_ps(_min_d_I, _tmp_I_I);
-                        tmp_exp_I[0]  = tmp_exp_I[0] != 0 ? expf(tmp_exp_I[0]) : 0.9;
-                        tmp_exp_I[1]  = tmp_exp_I[1] != 0 ? expf(tmp_exp_I[1]) : 0.9;
-                        tmp_exp_I[2]  = tmp_exp_I[2] != 0 ? expf(tmp_exp_I[2]) : 0.9;
-                        tmp_exp_I[3]  = tmp_exp_I[3] != 0 ? expf(tmp_exp_I[3]) : 0.9;
-                        _tmp_H_I  = _mm_div_ps(_tmp_I_I, _mm_sub_ps(_one, *_tmp_exp_I));
-                        _r_i_I[i_node_vec] = _tmp_H_I;
-                        
-                        
-                        gaussrand(rand_number);
-                        _S_i_I[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_I[i_node_vec]),_mm_mul_ps(_dt,_mm_add_ps(_mm_mul_ps(_imintau_I, _S_i_I[i_node_vec]),_mm_mul_ps(_tmp_H_I,_gamma_I))));
-                        
-                        gaussrand(rand_number);
-                        _S_i_E[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_E[i_node_vec]),_mm_mul_ps(_dt, _mm_add_ps(_mm_mul_ps(_imintau_E, _S_i_E[i_node_vec]),_mm_mul_ps(_mm_mul_ps(_mm_sub_ps(_one, _S_i_E[i_node_vec]),_gamma),_tmp_H_E))));
-                    }
-                    memcpy(&region_activity[ring_buf_pos], S_i_E, regions*sizeof( float ));
-                    ring_buf_pos = ring_buf_pos<(reg_act_size-regions) ? (ring_buf_pos+regions) : 0;
-                }
-            }
+            ******************************************************************************************
+            *************************************** FIC TUNING ***************************************
+            ******************************************************************************************
+            */
             
-            /*
-             Main FIC simulation phase
-             */
-            for ( ; ts < FIC_time_steps; ts++) {
-                for (int_i = 0; int_i < 10; int_i++) {
-                    
-                    /*
-                     Compute global coupling
-                     */
-                    for(j=0; j<regions; j++){
-                        tmpglobinput = 0;
-                        for (k=0; k<n_conn_table[j]; k++) {
-                            tmpglobinput += *reg_globinp_p[j+ring_buf_pos].Xi_elems[k] * SC_cap[j].cap[k];
-                        }
-                        global_input[j] = tmpglobinput;
-                    }
-                    
-                    for (i_node_vec = 0; i_node_vec < nodes_vec; i_node_vec++) {
-                        // Excitatory population firing rate
-                        //_tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
-                        
-                        // _tmp_I_E        = _mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])));
-                        _tmp_I_E        = _mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_mm_mul_ps(_w_plus, _J_NMDA[i_node_vec]), _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])));
-                        _FIC_I_E[i_node_vec] = _mm_add_ps(_FIC_I_E[i_node_vec],_tmp_I_E);
-                        _tmp_I_E        = _mm_sub_ps(_mm_mul_ps(_a_E,_tmp_I_E),_b_E);
-                        *_tmp_exp_E     = _mm_mul_ps(_min_d_E, _tmp_I_E);
-                        tmp_exp_E[0]    = tmp_exp_E[0] != 0 ? expf(tmp_exp_E[0]) : 0.9;
-                        tmp_exp_E[1]    = tmp_exp_E[1] != 0 ? expf(tmp_exp_E[1]) : 0.9;
-                        tmp_exp_E[2]    = tmp_exp_E[2] != 0 ? expf(tmp_exp_E[2]) : 0.9;
-                        tmp_exp_E[3]    = tmp_exp_E[3] != 0 ? expf(tmp_exp_E[3]) : 0.9;
-                        _tmp_H_E        = _mm_div_ps(_tmp_I_E, _mm_sub_ps(_one, *_tmp_exp_E));
-                        
-                        _meanFR[i_node_vec] = _mm_add_ps(_meanFR[i_node_vec],_tmp_H_E);
-                        _r_i_E[i_node_vec]  = _tmp_H_E;
-                        
-                        // Inhibitory population firing rate
-                        _tmp_I_I = _mm_sub_ps(_mm_mul_ps(_a_I,_mm_sub_ps(_mm_add_ps(_w_I__I_0,_mm_mul_ps(_J_NMDA[i_node_vec], _S_i_E[i_node_vec])), _S_i_I[i_node_vec])),_b_I);
-                        *_tmp_exp_I   = _mm_mul_ps(_min_d_I, _tmp_I_I);
-                        tmp_exp_I[0]  = tmp_exp_I[0] != 0 ? expf(tmp_exp_I[0]) : 0.9;
-                        tmp_exp_I[1]  = tmp_exp_I[1] != 0 ? expf(tmp_exp_I[1]) : 0.9;
-                        tmp_exp_I[2]  = tmp_exp_I[2] != 0 ? expf(tmp_exp_I[2]) : 0.9;
-                        tmp_exp_I[3]  = tmp_exp_I[3] != 0 ? expf(tmp_exp_I[3]) : 0.9;
-                        _tmp_H_I  = _mm_div_ps(_tmp_I_I, _mm_sub_ps(_one, *_tmp_exp_I));
-                        _r_i_I[i_node_vec] = _tmp_H_I;
-                        
-                        
-                        gaussrand(rand_number);
-                        _S_i_I[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_I[i_node_vec]),_mm_mul_ps(_dt,_mm_add_ps(_mm_mul_ps(_imintau_I, _S_i_I[i_node_vec]),_mm_mul_ps(_tmp_H_I,_gamma_I))));
-                        
-                        gaussrand(rand_number);
-                        _S_i_E[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_E[i_node_vec]),_mm_mul_ps(_dt, _mm_add_ps(_mm_mul_ps(_imintau_E, _S_i_E[i_node_vec]),_mm_mul_ps(_mm_mul_ps(_mm_sub_ps(_one, _S_i_E[i_node_vec]),_gamma),_tmp_H_E))));
-                    }
-                    memcpy(&region_activity[ring_buf_pos], S_i_E, regions*sizeof( float ));
-                    ring_buf_pos = ring_buf_pos<(reg_act_size-regions) ? (ring_buf_pos+regions) : 0;
-                }
-            }
-            
-            
-            
-            tuning_factor *= 0.96;
-            if (tuning_factor < 0.4) tuning_factor = 0.4;
-            
-            
-            FIC_termination_flag = 0;
-            mean_mean_FR = 0;
-            printf("*****************************************************************\n");
-            for (j = 0; j < nodes; j++){
-                tmp_Ji[j]     = J_i[j];
-                FIC_I_E[j]    = (FIC_I_E[j] - FIC_norm_term) / FIC_norm_fact;
-                meanFR[j]     = meanFR[j] / FIC_norm_fact;
-                mean_mean_FR  += meanFR[j];
-                if ( fabsf(FIC_I_E[j] + 0.026f) >  0.005) {
-                    
-                    FIC_delta[j]  =   (0.9253 * powf(meanFR[j], 0.1337) - 1.08) * tuning_factor;
-                    //FIC_delta[j]  =  (meanFR[j] - 3.0631) * tuning_factor;
-                    
-                    J_i[j]       +=  FIC_delta[j];
-                    
-                    /*
-                     if (FIC_I_E[j] < -0.026) {
-                     J_i[j]       -= FIC_delta[j];
-                     FIC_delta[j] -= 0.001;
-                     if (FIC_delta[j] < 0.001) {
-                     FIC_delta[j] = 0.001;
-                     }
-                     } else {
-                     J_i[j]       += FIC_delta[j];
-                     }
-                     */
-                } else {
-                    FIC_termination_flag++;
-                    FIC_delta[j]  =   0.0;
-                }
-                printf("%d ### %.4f \t\t %.2f \t\t %.3f \t\t %.2f \n", j, FIC_I_E[j], J_i[j], FIC_delta[j], meanFR[j]);
-            }
-            mean_mean_FR  /= nodes;
-            
-            
-            // Current tuning is current optimum, so store these settings
-            if (FIC_termination_flag >= max_num_nodes) {
-                max_num_nodes = FIC_termination_flag;
-                best_mean_FR  = mean_mean_FR;
-                best_iter     = i_fic;
+            tuning_factor       = 1.0;
+            max_num_nodes       = 0;
+            best_mean_FR        = 0;
+            for (i_fic = 0; i_fic < FIC_iters; i_fic++) {
                 
-                for (j = 0; j < nodes; j++){
-                    best_Ji[j]                      = tmp_Ji[j];
+                // Reset arrays
+                for (j = 0; j < nodes; j++) {
+                    S_i_E[j]            = 0.001;
+                    S_i_I[j]            = 0.001;
+                    global_input[j]     = 0.001;
+                    meanFR[j]           = 0.0;
+                    FIC_I_E[j]          = 0.0;
                 }
+                ring_buf_pos        = 0;
+                for (j=0; j<maxdelay*regions; j++) {
+                    region_activity[j]=0.001;
+                }
+                
+                
+                /*
+                Burn-in phase
+                */
+                for (ts = 0; ts < FIC_burn_in_ts; ts++) {
+                    for (int_i = 0; int_i < 10; int_i++) {
+                        
+                        /*
+                        Compute global coupling
+                        */
+                        for(j=0; j<regions; j++){
+                            tmpglobinput = 0;
+                            for (k=0; k<n_conn_table[j]; k++) {
+                                tmpglobinput += *reg_globinp_p[j+ring_buf_pos].Xi_elems[k] * SC_cap[j].cap[k];
+                            }
+                            global_input[j] = tmpglobinput;
+                        }
+                        
+                        for (i_node_vec = 0; i_node_vec < nodes_vec; i_node_vec++) {
+                            // Excitatory population firing rate
+                            // _tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
+                            _tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_mm_mul_ps(_w_plus, _J_NMDA[i_node_vec]), _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
+                            
+                            *_tmp_exp_E     = _mm_mul_ps(_min_d_E, _tmp_I_E);
+                            tmp_exp_E[0]    = tmp_exp_E[0] != 0 ? expf(tmp_exp_E[0]) : 0.9;
+                            tmp_exp_E[1]    = tmp_exp_E[1] != 0 ? expf(tmp_exp_E[1]) : 0.9;
+                            tmp_exp_E[2]    = tmp_exp_E[2] != 0 ? expf(tmp_exp_E[2]) : 0.9;
+                            tmp_exp_E[3]    = tmp_exp_E[3] != 0 ? expf(tmp_exp_E[3]) : 0.9;
+                            _tmp_H_E        = _mm_div_ps(_tmp_I_E, _mm_sub_ps(_one, *_tmp_exp_E));
+                            
+                            //_meanFR[i_node_vec] = _mm_add_ps(_meanFR[i_node_vec],_tmp_H_E);
+                            _r_i_E[i_node_vec]  = _tmp_H_E;
+                            
+                            // Inhibitory population firing rate
+                            _tmp_I_I = _mm_sub_ps(_mm_mul_ps(_a_I,_mm_sub_ps(_mm_add_ps(_w_I__I_0,_mm_mul_ps(_J_NMDA[i_node_vec], _S_i_E[i_node_vec])), _S_i_I[i_node_vec])),_b_I);
+                            *_tmp_exp_I   = _mm_mul_ps(_min_d_I, _tmp_I_I);
+                            tmp_exp_I[0]  = tmp_exp_I[0] != 0 ? expf(tmp_exp_I[0]) : 0.9;
+                            tmp_exp_I[1]  = tmp_exp_I[1] != 0 ? expf(tmp_exp_I[1]) : 0.9;
+                            tmp_exp_I[2]  = tmp_exp_I[2] != 0 ? expf(tmp_exp_I[2]) : 0.9;
+                            tmp_exp_I[3]  = tmp_exp_I[3] != 0 ? expf(tmp_exp_I[3]) : 0.9;
+                            _tmp_H_I  = _mm_div_ps(_tmp_I_I, _mm_sub_ps(_one, *_tmp_exp_I));
+                            _r_i_I[i_node_vec] = _tmp_H_I;
+                            
+                            
+                            gaussrand(rand_number);
+                            _S_i_I[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_I[i_node_vec]),_mm_mul_ps(_dt,_mm_add_ps(_mm_mul_ps(_imintau_I, _S_i_I[i_node_vec]),_mm_mul_ps(_tmp_H_I,_gamma_I))));
+                            
+                            gaussrand(rand_number);
+                            _S_i_E[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_E[i_node_vec]),_mm_mul_ps(_dt, _mm_add_ps(_mm_mul_ps(_imintau_E, _S_i_E[i_node_vec]),_mm_mul_ps(_mm_mul_ps(_mm_sub_ps(_one, _S_i_E[i_node_vec]),_gamma),_tmp_H_E))));
+                        }
+                        memcpy(&region_activity[ring_buf_pos], S_i_E, regions*sizeof( float ));
+                        ring_buf_pos = ring_buf_pos<(reg_act_size-regions) ? (ring_buf_pos+regions) : 0;
+                    }
+                }
+                
+                /*
+                Main FIC simulation phase
+                */
+                for ( ; ts < FIC_time_steps; ts++) {
+                    for (int_i = 0; int_i < 10; int_i++) {
+                        
+                        /*
+                        Compute global coupling
+                        */
+                        for(j=0; j<regions; j++){
+                            tmpglobinput = 0;
+                            for (k=0; k<n_conn_table[j]; k++) {
+                                tmpglobinput += *reg_globinp_p[j+ring_buf_pos].Xi_elems[k] * SC_cap[j].cap[k];
+                            }
+                            global_input[j] = tmpglobinput;
+                        }
+                        
+                        for (i_node_vec = 0; i_node_vec < nodes_vec; i_node_vec++) {
+                            // Excitatory population firing rate
+                            //_tmp_I_E    = _mm_sub_ps(_mm_mul_ps(_a_E,_mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])))),_b_E);
+                            
+                            // _tmp_I_E        = _mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_w_plus_J_NMDA, _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])));
+                            _tmp_I_E        = _mm_add_ps(_mm_add_ps(_w_E__I_0,_mm_mul_ps(_mm_mul_ps(_w_plus, _J_NMDA[i_node_vec]), _S_i_E[i_node_vec])),_mm_sub_ps(_global_input[i_node_vec],_mm_mul_ps(_J_i[i_node_vec], _S_i_I[i_node_vec])));
+                            _FIC_I_E[i_node_vec] = _mm_add_ps(_FIC_I_E[i_node_vec],_tmp_I_E);
+                            _tmp_I_E        = _mm_sub_ps(_mm_mul_ps(_a_E,_tmp_I_E),_b_E);
+                            *_tmp_exp_E     = _mm_mul_ps(_min_d_E, _tmp_I_E);
+                            tmp_exp_E[0]    = tmp_exp_E[0] != 0 ? expf(tmp_exp_E[0]) : 0.9;
+                            tmp_exp_E[1]    = tmp_exp_E[1] != 0 ? expf(tmp_exp_E[1]) : 0.9;
+                            tmp_exp_E[2]    = tmp_exp_E[2] != 0 ? expf(tmp_exp_E[2]) : 0.9;
+                            tmp_exp_E[3]    = tmp_exp_E[3] != 0 ? expf(tmp_exp_E[3]) : 0.9;
+                            _tmp_H_E        = _mm_div_ps(_tmp_I_E, _mm_sub_ps(_one, *_tmp_exp_E));
+                            
+                            _meanFR[i_node_vec] = _mm_add_ps(_meanFR[i_node_vec],_tmp_H_E);
+                            _r_i_E[i_node_vec]  = _tmp_H_E;
+                            
+                            // Inhibitory population firing rate
+                            _tmp_I_I = _mm_sub_ps(_mm_mul_ps(_a_I,_mm_sub_ps(_mm_add_ps(_w_I__I_0,_mm_mul_ps(_J_NMDA[i_node_vec], _S_i_E[i_node_vec])), _S_i_I[i_node_vec])),_b_I);
+                            *_tmp_exp_I   = _mm_mul_ps(_min_d_I, _tmp_I_I);
+                            tmp_exp_I[0]  = tmp_exp_I[0] != 0 ? expf(tmp_exp_I[0]) : 0.9;
+                            tmp_exp_I[1]  = tmp_exp_I[1] != 0 ? expf(tmp_exp_I[1]) : 0.9;
+                            tmp_exp_I[2]  = tmp_exp_I[2] != 0 ? expf(tmp_exp_I[2]) : 0.9;
+                            tmp_exp_I[3]  = tmp_exp_I[3] != 0 ? expf(tmp_exp_I[3]) : 0.9;
+                            _tmp_H_I  = _mm_div_ps(_tmp_I_I, _mm_sub_ps(_one, *_tmp_exp_I));
+                            _r_i_I[i_node_vec] = _tmp_H_I;
+                            
+                            
+                            gaussrand(rand_number);
+                            _S_i_I[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_I[i_node_vec]),_mm_mul_ps(_dt,_mm_add_ps(_mm_mul_ps(_imintau_I, _S_i_I[i_node_vec]),_mm_mul_ps(_tmp_H_I,_gamma_I))));
+                            
+                            gaussrand(rand_number);
+                            _S_i_E[i_node_vec] = _mm_add_ps(_mm_add_ps(_mm_mul_ps(_sigma, *_rand_number),_S_i_E[i_node_vec]),_mm_mul_ps(_dt, _mm_add_ps(_mm_mul_ps(_imintau_E, _S_i_E[i_node_vec]),_mm_mul_ps(_mm_mul_ps(_mm_sub_ps(_one, _S_i_E[i_node_vec]),_gamma),_tmp_H_E))));
+                        }
+                        memcpy(&region_activity[ring_buf_pos], S_i_E, regions*sizeof( float ));
+                        ring_buf_pos = ring_buf_pos<(reg_act_size-regions) ? (ring_buf_pos+regions) : 0;
+                    }
+                }
+                
+                
+                
+                tuning_factor *= 0.96;
+                if (tuning_factor < 0.4) tuning_factor = 0.4;
+                
+                
+                FIC_termination_flag = 0;
+                mean_mean_FR = 0;
+                printf("*****************************************************************\n");
+                for (j = 0; j < nodes; j++){
+                    tmp_Ji[j]     = J_i[j];
+                    FIC_I_E[j]    = (FIC_I_E[j] - FIC_norm_term) / FIC_norm_fact;
+                    meanFR[j]     = meanFR[j] / FIC_norm_fact;
+                    mean_mean_FR  += meanFR[j];
+                    if ( fabsf(FIC_I_E[j] + 0.026f) >  0.005) {
+                        
+                        FIC_delta[j]  =   (0.9253 * powf(meanFR[j], 0.1337) - 1.08) * tuning_factor;
+                        // FIC_delta[j]  =  (meanFR[j] - 3.0631) * tuning_factor;
+                        
+                        J_i[j]       +=  FIC_delta[j];
+                        
+                        /*
+                        if (FIC_I_E[j] < -0.026) {
+                        J_i[j]       -= FIC_delta[j];
+                        FIC_delta[j] -= 0.001;
+                        if (FIC_delta[j] < 0.001) {
+                        FIC_delta[j] = 0.001;
+                        }
+                        } else {
+                        J_i[j]       += FIC_delta[j];
+                        }
+                        */
+                    } else {
+                        FIC_termination_flag++;
+                        FIC_delta[j]  =   0.0;
+                    }
+                    printf("%d ### %.4f \t\t %.2f \t\t %.3f \t\t %.2f \n", j, FIC_I_E[j], J_i[j], FIC_delta[j], meanFR[j]);
+                }
+                mean_mean_FR  /= nodes;
+                
+                
+                // Current tuning is current optimum, so store these settings
+                if (FIC_termination_flag >= max_num_nodes) {
+                    max_num_nodes = FIC_termination_flag;
+                    best_mean_FR  = mean_mean_FR;
+                    best_iter     = i_fic;
+                    
+                    for (j = 0; j < nodes; j++){
+                        best_Ji[j]                      = tmp_Ji[j];
+                    }
+                }
+                
+                printf("Iter: %d   N_nodes: %d / %d (%.2f Hz, iter: %d)   tuningfact: %.5f    meanFR: %.2f\n", i_fic, FIC_termination_flag,max_num_nodes,best_mean_FR, best_iter, tuning_factor,mean_mean_FR);
+                
+                // This is the goal of FIC tuning
+                if (FIC_termination_flag == nodes) {
+                    break;
+                }
+                
             }
             
-            printf("Iter: %d   N_nodes: %d / %d (%.2f Hz, iter: %d)   tuningfact: %.5f    meanFR: %.2f\n", i_fic, FIC_termination_flag,max_num_nodes,best_mean_FR, best_iter, tuning_factor,mean_mean_FR);
             
-            // This is the goal of FIC tuning
-            if (FIC_termination_flag == nodes) {
-                break;
+            /*
+            Adjust best J_i values found in FIC tuning 
+            by J_i_scale, write it to output file, and set
+            it to the J_i value at each node
+            */
+            for (j=0; j<nodes; j++) {
+                J_i[j] = best_Ji[j] * J_i_scale;
+                fprintf(JIout, "%.4f\n",J_i[j]);
             }
-            
-        }
-        
-        
-        /*
-         Adjust best J_i values found in FIC tuning 
-         by J_i_scale, write it to output file, and set
-         it to the J_i value at each node
-         */
-        for (j=0; j<nodes; j++) {
-            J_i[j] = best_Ji[j] * J_i_scale;
-            fprintf(JIout, "%.4f\n",J_i[j]);
-        }      
 
-        
-        /*
-         *************************************************************************************************
-         *************************************** END OF FIC TUNING ***************************************
-         *************************************************************************************************
-         */
-        
+            
+            /*
+            *************************************************************************************************
+            *************************************** END OF FIC TUNING ***************************************
+            *************************************************************************************************
+            */
+        } else {
+            // skip FIC tuning if indicated
+            for (j=0; j<nodes; j++) {
+                J_i[j] = tmpJi;
+                fprintf(JIout, "%.4f\n",J_i[j]);
+            }
+        }
         
         
         
