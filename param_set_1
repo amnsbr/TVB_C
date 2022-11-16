@@ -1,17 +1,15 @@
-1.0 1.0 1.0 2.5 0.01 400000 10000 720 999999.99 41 1.0 0.1
+10.0 5.0 2.0 5.0 1.0 0.1 400000 720 999999.99 410
 
 
 Parameter sorting:
 
-2. G: 		global coupling scaling factor
-3. J_NMDA_bias: 	strength of NMDA coupling (may be scaled by heterogeneity_scale if specified)
-4. w_plus:	strength of excitatory recurrence
-5. J_i:		the initial J_i value -- will be overwritten by J_i tuning (if FIC_len > 0)
-6. sigma: 	noise level
+1. G: 		global coupling scaling factor
+2. w_EE_bias:   strength of E->E synapses (may be scaled by heterogeneity_scale if specified)
+3. w_EI_bias:   strength of E->I synapses (may be scaled by heterogeneity_scale if specified)
+4. J_i:		the initial J_i value -- will be used if no FIC tuning is done
+5. J_i_scale: adjust best J_i in each node (from FIC output) by this ratio
+6. heterogeneity_scale: if heterogeneity file exists, scale w_EE_bias and w_EI_bias by (1 + heterogeneity_map[j] * heterogeneity_scale)
 7. time_steps:  simulation time steps in ms
-8. FIC_len: 	length of the time window for which average firing rates are computed during FIC in ms. Experience shows that it shouldn't be shorter than 10000 ms.
-9. BOLD_TR:  	TR of the simulated BOLD data in ms
-10. trans_v:    transmission velocity in m/s. For instantaneous transmission set to a large value (like 999999.99)
-11. seed:     	seed for random number generator
-12. J_i_scale: adjust best J_i in each node (from FIC output) by this ratio
-13. heterogeneity_scale: if heterogeneity file exists, scale J_NMDA by (1 + heterogeneity_map[j] * heterogeneity_scale)
+8. BOLD_TR:  	TR of the simulated BOLD data in ms
+9. trans_v:    transmission velocity in m/s. For instantaneous transmission set to a large value (like 999999.99)
+10. seed:     	seed for random number generator
