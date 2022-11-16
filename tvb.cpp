@@ -13,6 +13,7 @@
 #include <string.h>
 #include <math.h>
 #include "fic.cpp"
+#include "check_fit.cpp"
 //#include "mpi.h"
 
 struct Xi_p{
@@ -60,27 +61,6 @@ FILE *meanFRout;
     
 //     return (sxy / (sqrt(sxsq)*sqrt(sysq)));
 // }
-
-
-void openoutfiles(char *paramset){
-    char outfilename[1000];memset(outfilename, 0, 1000*sizeof(char));
-    char buffer[10];memset(buffer, 0, 10*sizeof(char));
-    strcpy (outfilename,"output/");
-    strcat (outfilename,"/simBOLD_");strcat (outfilename,paramset);
-    strcat (outfilename,".txt");
-    BOLDout = fopen(outfilename, "w");
-    memset(outfilename, 0, 1000*sizeof(char));
-    strcpy (outfilename,"output/");
-    strcat (outfilename,"/Ji_");strcat (outfilename,paramset);
-    strcat (outfilename,".txt");
-    JIout = fopen(outfilename, "w");
-    memset(outfilename, 0, 1000*sizeof(char));
-    strcpy (outfilename,"output/");
-    strcat (outfilename,"/meanFR_");strcat (outfilename,paramset);
-    strcat (outfilename,".txt");
-    meanFRout = fopen(outfilename, "w");
-}
-
 
 
 float gaussrand_ret()
@@ -316,8 +296,12 @@ int main(int argc, char *argv[])
         printf( "\nERROR: Wrong number of arguments.\n\nUsage: tvbii <paramfile> <path-to-subject> <n_regions>\n\nTerminating... \n\n");
         exit(0);
     }
-    openoutfiles(argv[1]);    
-    
+    char * bold_filename = "output/simBOLD.txt"; // TODO: get output folder as an argument
+    BOLDout = fopen(bold_filename, "w");
+    char * ji_filename = "output/Ji.txt";
+    JIout = fopen(ji_filename, "w");
+    char * fr_filename = "output/meanFR.txt";
+    meanFRout = fopen(fr_filename, "w");    
     
     
     /*
@@ -739,7 +723,7 @@ int main(int argc, char *argv[])
          Print fMRI time series
          */
         for (i=0; i<BOLD_len_i; i++) {
-            for (j=0; j<num_output_ts; j++) {
+            for (j=0; j<real_nodes; j++) {
                 fprintf(BOLDout, "%.7f ",BOLD_ex[j][i]);
             }
             fprintf(BOLDout, "\n");
@@ -751,8 +735,7 @@ int main(int argc, char *argv[])
         
         
     }
-    
-    
+
     _mm_free(n_conn_table);
     _mm_free(region_activity);
     _mm_free(n_conn_table_G_NMDA);
@@ -762,6 +745,19 @@ int main(int argc, char *argv[])
     fclose(BOLDout);
     fclose(JIout);
     printf("TVB_C with analytical FIC tuning finished. Execution took %.2f s\n", (float)(time(NULL) - start));
-    
+
+
+    // Checking fit to empirical data
+    char emp_fc_filename[1000];memset(emp_fc_filename, 0, 1000*sizeof(char));
+    strcpy(emp_fc_filename,argv[2]);strcat(emp_fc_filename,"/emp_FCtril.txt");
+    char emp_fcd_filename[1000];memset(emp_fcd_filename, 0, 1000*sizeof(char));
+    strcpy(emp_fcd_filename,argv[2]);strcat(emp_fcd_filename,"/emp_FCDtril.txt");
+
+    // Check fit and calculate cost function
+    // the goal is to minimize cost function
+    double cost = check_fit(real_nodes, time_steps, BOLD_TR, 2, 14, true, false,
+        emp_fc_filename, emp_fcd_filename, bold_filename);
+    printf("Cost: %f\n", cost);
+
     return 0;
 }
