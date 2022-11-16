@@ -12,6 +12,7 @@
 #include <time.h>
 #include <string.h>
 #include <math.h>
+#include "fic.cpp"
 //#include "mpi.h"
 
 struct Xi_p{
@@ -445,15 +446,12 @@ int main(int argc, char *argv[])
         J_i[j]              = tmpJi;
     }
 
-
-    // // Temporary: get FIC resutls from hBNM that was executred with the
-    // // same parameters
-    // FILE * file_Ji = fopen("/data/project/ei_development/tools/hbnm_C/output/wie.txt", "r");
-    // for (j = 0; j < nodes; j++) {
-    //     fscanf(file_Ji, "%f", &J_i[j]);
-    //     printf("%f\n", J_i[j]);
-    // }
-
+    char full_cap_file[1000];memset(full_cap_file, 0, 1000*sizeof(char));
+    strcpy(full_cap_file,argv[2]);strcat(full_cap_file,"/SC_strengths_full.txt");
+    do_fic(J_i, real_nodes, full_cap_file, G, w_EE_bias, w_EI_bias, J_i_scale);
+    for (j = 0; j < real_nodes; j++) {
+        fprintf(JIout, "%f\n", J_i[j]);
+    }
     
 
 
@@ -507,7 +505,7 @@ int main(int argc, char *argv[])
     strcpy(dist_file,argv[2]);strcat(dist_file,"/SC_distances.txt");
     char reg_file[1000];memset(reg_file, 0, 1000*sizeof(char));
     strcpy(reg_file,argv[2]);strcat(reg_file,"/SC_regionids.txt");
-    
+
     int         maxdelay = importGlobalConnectivity(cap_file, dist_file, reg_file, regions, &region_activity, &reg_globinp_p, global_trans_v, &n_conn_table, &n_conn_table_G_NMDA, G_J_NMDA, &SC_cap, &SC_rowsums, &SC_inpreg);
     int         reg_act_size = regions * maxdelay;    
     
@@ -733,7 +731,7 @@ int main(int argc, char *argv[])
         mean_mean_FR /= real_nodes;
         // print mean firing rate for eachn node
         for (i=0; i<real_nodes;i++) {
-            fprintf(meanFRout, "%.7f ",meanFR[i]);
+            fprintf(meanFRout, "%.7f\n",meanFR[i]);
         }
         printf("Mean FR across all nodes was %f\n", mean_mean_FR);
         
