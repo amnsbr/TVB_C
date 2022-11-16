@@ -446,9 +446,9 @@ int main(int argc, char *argv[])
         J_i[j]              = tmpJi;
     }
 
-    char full_cap_file[1000];memset(full_cap_file, 0, 1000*sizeof(char));
-    strcpy(full_cap_file,argv[2]);strcat(full_cap_file,"/SC_strengths_full.txt");
-    do_fic(J_i, real_nodes, full_cap_file, G, w_EE_bias, w_EI_bias, J_i_scale);
+    char sc_strength_matrix_path[1000];memset(sc_strength_matrix_path, 0, 1000*sizeof(char));
+    strcpy(sc_strength_matrix_path,argv[2]);strcat(sc_strength_matrix_path,"/SC_strengths_matrix.txt");
+    do_fic(J_i, real_nodes, sc_strength_matrix_path, G, w_EE_bias, w_EI_bias, J_i_scale);
     for (j = 0; j < real_nodes; j++) {
         fprintf(JIout, "%f\n", J_i[j]);
     }

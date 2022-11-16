@@ -331,6 +331,11 @@ class Model {
 
 void do_fic(float * J_i, int n_regions, char * sc_path, float G, float w_EE_bias, float w_EI_bias, float J_i_scale) {
     md.fic_only = true;
+    // if fic_only is set to false, model stability is also
+    // checked (based on eigenvalues of jacobian, which also takes
+    // some time to calculate) and the simulation will be aborted.
+    // with fic_only=true, also if Ji is negative in any nodes the simulation
+    // will be aborted.
     gsl_matrix * sc = gsl_matrix_alloc(n_regions, n_regions);
     FILE * sc_file = fopen(sc_path, "r");
     gsl_matrix_fscanf(sc_file, sc);
@@ -340,6 +345,5 @@ void do_fic(float * J_i, int n_regions, char * sc_path, float G, float w_EE_bias
     for (int i=0; i<n_regions; i++) {
         J_i[i] = (float)gsl_vector_get(md._w_IE, i);
     }
-    // TODO: consider the case that FIC fails (negative Ji)
     return;
 }
